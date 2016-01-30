@@ -220,6 +220,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void send() {
+        String data = computeData();
+
+        Log.d(TAG, "New value: " + data);
+        m_btGattCharacteristic.setValue(data);
+        m_btGatt.writeCharacteristic(m_btGattCharacteristic);
+    }
+
+    protected String computeData() {
         IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
         Intent batteryStatus = m_context.registerReceiver(null, ifilter);
 
@@ -232,23 +240,19 @@ public class MainActivity extends AppCompatActivity {
         long availableExternalMemorySize = getAvailableExternalMemorySize();
         long totalExternalMemorySize = getTotalExternalMemorySize();
 
-        float diskUsageFloat = 0.0f;
+        double diskAvailableDouble = 0.0f;
         if (totalExternalMemorySize > 0) {
-            diskUsageFloat = availableExternalMemorySize / totalExternalMemorySize;
+            diskAvailableDouble = (double) availableExternalMemorySize / (double) totalExternalMemorySize;
         }
 
-        int diskUsage = (int) diskUsageFloat * 100;
+        int diskUsage = (int) ((1.0f - diskAvailableDouble) * 100.0f);
 
-        String newValue =
-                    Integer.toString(battery)
+        return
+                Integer.toString(battery)
                 +   TAG_BATTERY_SEPARATOR
                 +   Integer.toString(diskUsage)
                 +   TAG_DISK_SEPARATOR
                 +   '\n';
-
-        Log.d(TAG, "New value: " + newValue);
-        m_btGattCharacteristic.setValue(newValue);
-        m_btGatt.writeCharacteristic(m_btGattCharacteristic);
     }
 
     public static boolean externalMemoryAvailable() {
@@ -260,9 +264,8 @@ public class MainActivity extends AppCompatActivity {
         if (externalMemoryAvailable()) {
             File path = Environment.getExternalStorageDirectory();
             StatFs stat = new StatFs(path.getPath());
-            long blockSize = stat.getBlockSizeLong();
             long availableBlocks = stat.getAvailableBlocksLong();
-            return availableBlocks * blockSize;
+            return availableBlocks;
         } else {
             return 0;
         }
@@ -272,9 +275,8 @@ public class MainActivity extends AppCompatActivity {
         if (externalMemoryAvailable()) {
             File path = Environment.getExternalStorageDirectory();
             StatFs stat = new StatFs(path.getPath());
-            long blockSize = stat.getBlockSizeLong();
             long totalBlocks = stat.getBlockCountLong();
-            return totalBlocks * blockSize;
+            return totalBlocks;
         } else {
             return 0;
         }
