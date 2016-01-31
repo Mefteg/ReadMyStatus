@@ -11,6 +11,8 @@ import android.content.pm.PackageManager;
 import android.os.BatteryManager;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.os.StatFs;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -43,17 +45,10 @@ public class MainActivity extends AppCompatActivity {
     // Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 20000;
 
-    public final static String ACTION_GATT_CONNECTED =
-            "com.example.bluetooth.le.ACTION_GATT_CONNECTED";
-    public final static String ACTION_GATT_DISCONNECTED =
-            "com.example.bluetooth.le.ACTION_GATT_DISCONNECTED";
-    public final static String ACTION_GATT_SERVICES_DISCOVERED =
-            "com.example.bluetooth.le.ACTION_GATT_SERVICES_DISCOVERED";
-    public final static String ACTION_DATA_AVAILABLE =
-            "com.example.bluetooth.le.ACTION_DATA_AVAILABLE";
-    public final static String EXTRA_DATA =
-            "com.example.bluetooth.le.EXTRA_DATA";
+    protected final int UI_ACTION_UPDATE_BTN_CONNECT = 0;
 
+
+    // Callbacks
 
     // Device scan callback.
     private ScanCallback m_scanCallback =
@@ -85,7 +80,22 @@ public class MainActivity extends AppCompatActivity {
                     if (newState == BluetoothProfile.STATE_CONNECTED) {
                         Log.d(TAG, "\tCONNECTED");
 
+                        m_connected = true;
+
+                        // update UI
+                        Message messageToUi =
+                                m_handlerUI.obtainMessage(UI_ACTION_UPDATE_BTN_CONNECT);
+                        messageToUi.sendToTarget();
+
                         m_btGatt.discoverServices();
+                    }
+                    else if (newState == BluetoothProfile.STATE_DISCONNECTED){
+                        m_connected = false;
+
+                        // update UI
+                        Message messageToUi =
+                                m_handlerUI.obtainMessage(UI_ACTION_UPDATE_BTN_CONNECT);
+                        messageToUi.sendToTarget();
                     }
                 }
                 @Override
@@ -149,17 +159,23 @@ public class MainActivity extends AppCompatActivity {
                 }
             };
 
-    private Context m_context;
+    // BLE
+    protected BluetoothAdapter m_btAdapter = null;
+    protected BluetoothDevice m_btDevice = null;
+    protected BluetoothGatt m_btGatt = null;
+    protected BluetoothGattService m_btGattService = null;
+    protected BluetoothGattCharacteristic m_btGattCharacteristic = null;
 
-    protected BluetoothAdapter m_btAdapter;
-    protected BluetoothDevice m_btDevice;
-    protected BluetoothGatt m_btGatt;
-    protected BluetoothGattService m_btGattService;
-    protected BluetoothGattCharacteristic m_btGattCharacteristic;
+    private boolean m_scanning = false;
+    private boolean m_connected = false;
+    private Handler m_handler = null;
 
-    private boolean m_scanning;
-    private Handler m_handler;
+    // UI
+    private Context m_context = null;
 
+    protected Button m_btnConnect = null;
+
+    Handler m_handlerUI = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -187,16 +203,39 @@ public class MainActivity extends AppCompatActivity {
         m_scanning = false;
         m_handler = new Handler();
 
-        final Button btnScan = (Button) findViewById(R.id.btn_scan);
-        btnScan.setOnClickListener(new View.OnClickListener() {
+        m_btnConnect = (Button) findViewById(R.id.btn_connect);
+        m_btnConnect.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                // Perform action on click
-                scanLeDevice(!m_scanning);
+                if (m_connected) {
+                    if (m_btDevice != null) {
+                        closeDeviceConnection();
+
+                        m_connected = false;
+                        updateBtnConnect();
+                    }
+                } else {
+                    // first scan devices
+                    scanDevices(!m_scanning);
+                }
             }
         });
+
+        m_handlerUI = new Handler(Looper.getMainLooper()) {
+            @Override
+            public void handleMessage(Message inputMessage) {
+                // choose the action to perform
+                switch (inputMessage.arg1) {
+                    case UI_ACTION_UPDATE_BTN_CONNECT:
+                        updateBtnConnect();
+                        break;
+                    default:
+                        break;
+                }
+            }
+        };
     }
 
-    private void scanLeDevice(final boolean enable) {
+    private void scanDevices(final boolean enable) {
         if (enable) {
             // Stops scanning after a pre-defined scan period.
             m_handler.postDelayed(new Runnable() {
@@ -216,6 +255,24 @@ public class MainActivity extends AppCompatActivity {
         } else {
             m_scanning = false;
             m_btAdapter.getBluetoothLeScanner().stopScan(m_scanCallback);
+        }
+    }
+
+    protected void closeDeviceConnection() {
+        m_btGatt.close();
+
+        m_btGattCharacteristic = null;
+        m_btGattService = null;
+        m_btGatt = null;
+        m_btDevice = null;
+    }
+
+    protected void updateBtnConnect() {
+        if (m_connected) {
+            m_btnConnect.setText(getString(R.string.disconnect));
+        }
+        else {
+            m_btnConnect.setText(getString(R.string.connect));
         }
     }
 
