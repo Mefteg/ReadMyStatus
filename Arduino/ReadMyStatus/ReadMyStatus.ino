@@ -16,7 +16,11 @@ Ask for my tablet status periodically.
 #define DELAY_BEFORE_UPDATE 5000
 #define DELAY_AFTER_UPDATE 1000
 
+#define PIN_BATTERY 10
+
 TheAirBoard board;
+
+float battery = 0.0f;
 
 // the setup routine runs once when you press reset:
 void setup()
@@ -27,6 +31,8 @@ void setup()
   analogWrite(RED, LOW);
   analogWrite(GREEN, LOW);
   analogWrite(BLUE, LOW);
+
+  pinMode(PIN_BATTERY, OUTPUT);
 }
 
 // the loop routine runs over and over again forever:
@@ -34,6 +40,8 @@ void loop()
 {
   // check the battery
   board.batteryChk();
+
+  analogWrite(PIN_BATTERY, 255.0f * battery);
   
 	// if something is available to read
 	if(Serial.available())
